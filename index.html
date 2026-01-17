@@ -976,42 +976,10 @@ function loadTrendData() {
         return;
     }
     
-    let filtered = dailyData.filter(d => d.sku === sku && d.mall === mall);
+    const filtered = dailyData.filter(d => d.sku === sku && d.mall === mall);
     
     if (filtered.length === 0) {
         showNotification('該当するデータが見つかりません', true);
-        return;
-    }
-    
-    // 期間フィルター適用
-    const periodFilter = document.getElementById('periodFilter').value;
-    const today = new Date();
-    
-    if (periodFilter === '30') {
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        filtered = filtered.filter(d => new Date(d.date) >= thirtyDaysAgo);
-    } else if (periodFilter === '60') {
-        const sixtyDaysAgo = new Date(today);
-        sixtyDaysAgo.setDate(today.getDate() - 60);
-        filtered = filtered.filter(d => new Date(d.date) >= sixtyDaysAgo);
-    } else if (periodFilter === 'custom') {
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-        
-        if (!startDate || !endDate) {
-            showNotification('開始日と終了日を入力してください', true);
-            return;
-        }
-        
-        filtered = filtered.filter(d => {
-            const date = new Date(d.date);
-            return date >= new Date(startDate) && date <= new Date(endDate);
-        });
-    }
-    
-    if (filtered.length === 0) {
-        showNotification('指定期間にデータが見つかりません', true);
         return;
     }
     
@@ -1037,12 +1005,7 @@ function loadTrendData() {
     
     renderCharts(filtered, relevantActions);
     renderTrendTable(filtered, relevantActions);
-    
-    const periodText = periodFilter === 'all' ? '全期間' : 
-                      periodFilter === '30' ? '最近30日間' : 
-                      periodFilter === '60' ? '最近60日間' : 
-                      'カスタム期間';
-    showNotification(`✅ 日次推移を表示しました（${periodText}・${filtered.length}日分）`);
+    showNotification('✅ 日次推移を表示しました');
 }
         function displayActions(actions) {
             const container = document.getElementById('productActions');
