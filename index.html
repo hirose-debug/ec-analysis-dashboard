@@ -81,7 +81,8 @@
         .notification { position: fixed; top: 2rem; right: 2rem; padding: 1rem 1.5rem; background: var(--card); border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15); border-left: 4px solid var(--success); display: none; z-index: 1000; max-width: 400px; }
         .notification.show { display: block; animation: slideIn 0.3s ease; }
         .notification.error { border-left-color: var(--danger); }
-        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes s
+        lideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         input[type="file"] { display: none; }
         .chart-container { background: var(--card); padding: 2rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
         .view-content { display: none; }
@@ -89,6 +90,55 @@
         .btn-group { display: flex; gap: 0.5rem; background: var(--bg); padding: 0.5rem; border-radius: 8px; }
         .btn-group .btn { flex: 1; padding: 0.5rem 1rem; font-size: 0.875rem; }
         .btn-group .btn.active { background: var(--accent); }
+        .delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.2rem; padding: 0.5rem; transition: all 0.2s ease; }
+        .delete-btn:hover { transform: scale(1.2); }
+        .modal-overlay { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            background: rgba(0, 0, 0, 0.5); 
+            z-index: 2000; 
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { 
+            display: flex !important;
+        }
+        .modal { 
+            background: var(--card); 
+            border-radius: 16px; 
+            padding: 2rem; 
+            max-width: 500px; 
+            width: 90%; 
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); 
+            animation: slideUp 0.3s ease; 
+        }
+        @keyframes slideUp { 
+            from { transform: translateY(50px); opacity: 0; } 
+            to { transform: translateY(0); opacity: 1; } 
+        }
+        .modal-title { 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            margin-bottom: 1rem; 
+            color: var(--text); 
+        }
+        .modal-content { 
+            color: var(--text-muted); 
+            margin-bottom: 2rem; 
+            line-height: 1.6; 
+        }
+        .modal-buttons { 
+            display: flex; 
+            gap: 1rem; 
+            justify-content: flex-end; 
+        }
+        .modal-buttons .btn { 
+            flex: 1; 
+        }
     </style>
 </head>
 <body>
@@ -213,32 +263,52 @@
             </div>
         </div>
 
-        <div id="tab-trend" class="tab-content">
-            <div class="search-section">
-                <h2 style="margin-bottom: 1.5rem;">🔍 日次推移分析</h2>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">SKU</label>
-                        <input type="text" id="trendSKU" class="search-input" placeholder="例: 213-62">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">モール</label>
-                        <select id="trendMall" class="search-input">
-                            <option value="楽天">楽天</option>
-                            <option value="Yahoo">Yahoo</option>
-                            <option value="Amazon">Amazon</option>
-                        </select>
-                    </div>
-                </div>
-                <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
+<div id="tab-trend" class="tab-content">
+    <div class="search-section">
+        <h2 style="margin-bottom: 1.5rem;">🔍 日次推移分析</h2>
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">SKU</label>
+                <input type="text" id="trendSKU" class="search-input" placeholder="例: 213-62">
             </div>
-
-            <div class="chart-container" id="viewToggleContainer" style="display: none;">
-                <div class="btn-group">
-                    <button class="btn active" onclick="switchView('chart')">📊 グラフ表示</button>
-                    <button class="btn" onclick="switchView('table')">📋 表形式表示</button>
+            <div class="form-group">
+                <label class="form-label">モール</label>
+                <select id="trendMall" class="search-input">
+                    <option value="楽天">楽天</option>
+                    <option value="Yahoo">Yahoo</option>
+                    <option value="Amazon">Amazon</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- 期間フィルター追加 -->
+        <div class="form-group">
+            <label class="form-label">📅 表示期間</label>
+            <select id="periodFilter" class="search-input" onchange="toggleCustomPeriod()">
+                <option value="all">全期間</option>
+                <option value="30">最近30日間</option>
+                <option value="60">最近60日間</option>
+                <option value="custom">カスタム期間</option>
+            </select>
+        </div>
+        
+        <div id="customPeriodSection" style="display: none;">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">開始日</label>
+                    <input type="date" id="startDate" class="search-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">終了日</label>
+                    <input type="date" id="endDate" class="search-input">
                 </div>
             </div>
+        </div>
+        
+        <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
+    </div>
+    
+    <!-- 以下は既存のコード -->
 
             <div id="productActions" style="display: none;"></div>
 
@@ -885,47 +955,95 @@
             `).join('');
         }
 
-        function loadTrendData() {
-            const sku = document.getElementById('trendSKU').value.trim();
-            const mall = document.getElementById('trendMall').value;
-            
-            if (!sku) {
-                showNotification('SKUを入力してください', true);
-                return;
-            }
-            
-            const filtered = dailyData.filter(d => d.sku === sku && d.mall === mall);
-            
-            if (filtered.length === 0) {
-                showNotification('該当するデータが見つかりません', true);
-                return;
-            }
-            
-            filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
-            
-            const productName = filtered[0].name;
-            currentTrendData = filtered;
-            currentProductName = productName;
-            currentSKU = sku;
-            currentMall = mall;
-            
-            const relevantActions = actionsData.filter(a => 
-                a.sku === sku && (a.mall === mall || a.mall === '全サイト')
-            );
-            
-            displayActions(relevantActions);
-            
-            document.getElementById('viewToggleContainer').style.display = 'block';
-            document.getElementById('chartContainer').style.display = 'block';
-            document.getElementById('chartContainer2').style.display = 'block';
-            document.getElementById('chartContainer3').style.display = 'block';
-            document.getElementById('trendTableContainer').style.display = 'block';
-            
-            renderCharts(filtered, relevantActions);
-            renderTrendTable(filtered, relevantActions);
-            showNotification('✅ 日次推移を表示しました');
-        }
+       function toggleCustomPeriod() {
+    const periodFilter = document.getElementById('periodFilter').value;
+    const customSection = document.getElementById('customPeriodSection');
+    if (periodFilter === 'custom') {
+        customSection.style.display = 'block';
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('endDate').value = today;
+    } else {
+        customSection.style.display = 'none';
+    }
+}
 
+function loadTrendData() {
+    const sku = document.getElementById('trendSKU').value.trim();
+    const mall = document.getElementById('trendMall').value;
+    
+    if (!sku) {
+        showNotification('SKUを入力してください', true);
+        return;
+    }
+    
+    let filtered = dailyData.filter(d => d.sku === sku && d.mall === mall);
+    
+    if (filtered.length === 0) {
+        showNotification('該当するデータが見つかりません', true);
+        return;
+    }
+    
+    // 期間フィルター適用
+    const periodFilter = document.getElementById('periodFilter').value;
+    const today = new Date();
+    
+    if (periodFilter === '30') {
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        filtered = filtered.filter(d => new Date(d.date) >= thirtyDaysAgo);
+    } else if (periodFilter === '60') {
+        const sixtyDaysAgo = new Date(today);
+        sixtyDaysAgo.setDate(today.getDate() - 60);
+        filtered = filtered.filter(d => new Date(d.date) >= sixtyDaysAgo);
+    } else if (periodFilter === 'custom') {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        
+        if (!startDate || !endDate) {
+            showNotification('開始日と終了日を入力してください', true);
+            return;
+        }
+        
+        filtered = filtered.filter(d => {
+            const date = new Date(d.date);
+            return date >= new Date(startDate) && date <= new Date(endDate);
+        });
+    }
+    
+    if (filtered.length === 0) {
+        showNotification('指定期間にデータが見つかりません', true);
+        return;
+    }
+    
+    filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    const productName = filtered[0].name;
+    currentTrendData = filtered;
+    currentProductName = productName;
+    currentSKU = sku;
+    currentMall = mall;
+    
+    const relevantActions = actionsData.filter(a => 
+        a.sku === sku && (a.mall === mall || a.mall === '全サイト')
+    );
+    
+    displayActions(relevantActions);
+    
+    document.getElementById('viewToggleContainer').style.display = 'block';
+    document.getElementById('chartContainer').style.display = 'block';
+    document.getElementById('chartContainer2').style.display = 'block';
+    document.getElementById('chartContainer3').style.display = 'block';
+    document.getElementById('trendTableContainer').style.display = 'block';
+    
+    renderCharts(filtered, relevantActions);
+    renderTrendTable(filtered, relevantActions);
+    
+    const periodText = periodFilter === 'all' ? '全期間' : 
+                      periodFilter === '30' ? '最近30日間' : 
+                      periodFilter === '60' ? '最近60日間' : 
+                      'カスタム期間';
+    showNotification(`✅ 日次推移を表示しました（${periodText}・${filtered.length}日分）`);
+}
         function displayActions(actions) {
             const container = document.getElementById('productActions');
             
