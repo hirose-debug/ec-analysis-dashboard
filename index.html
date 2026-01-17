@@ -812,11 +812,149 @@ if (token && token.access_token) {
                 </tr>
             `).join('');
         }
-
-        function loadTrendData() {
-            showNotification('日次推移分析機能は開発中です');
+function loadTrendData() {
+    const sku = document.getElementById('trendSKU').value.trim();
+    const mall = document.getElementById('trendMall').value;
+    
+    if (!sku) {
+        showNotification('SKUを入力してください', true);
+        return;
+    }
+    
+    const filtered = dailyData.filter(d => d.sku === sku && d.mall === mall);
+    
+    if (filtered.length === 0) {
+        showNotification('該当するデータが見つかりません', true);
+        return;
+    }
+    
+    filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    const productName = filtered[0].name;
+    
+    // グラフコンテナを表示
+    const chartSection = document.createElement('div');
+    chartSection.className = 'chart-container';
+    chartSection.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.5rem; font-weight: 700;">${productName}</h3>
+            <button class="btn btn-secondary" onclick="exportTrendData()">📥 CSVエクスポート</button>
+        </div>
+        <canvas id="salesChart" height="80"></canvas>
+    `;
+    
+    // 既存のグラフがあれば削除
+    const existingChart = document.querySelector('.chart-container');
+    if (existingChart) {
+        existingChart.remove();
+    }
+    
+    // グラフを追加
+    const trendTab = document.getElementById('tab-trend');
+    trendTab.appendChild(chartSection);
+    
+    // データ準備
+    const dates = filtered.map(d => d.date);
+    const sales = filtered.map(d => d.sales);
+    const access = filtered.map(d => d.access);
+    const cvr = filtered.map(d => d.cvr);
+    
+    // グラフ描画
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: '売上（円）',
+                    data: sales,
+                    borderColor: 'rgb(6, 182, 212)',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    yAxisID: 'y',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'アクセス数',
+                    data: access,
+                    borderColor: 'rgb(99, 102, 241)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    yAxisID: 'y1',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'CVR（%）',
+                    data: cvr,
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    yAxisID: 'y2',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: '日次推移分析',
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: '売上（円）'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return '¥' + value.toLocaleString();
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'アクセス数'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                },
+                y2: {
+                    type: 'linear',
+                    display: false,
+                    position: 'right',
+                }
+            }
         }
+    });
+    
+    showNotification('✅ 日次推移を表示しました');
+}
 
+function exportTrendData() {
+    showNotification('CSVエクスポート機能は準備中です');
+}
+    
         async function addAction() {
             const action = {
                 date: document.getElementById('actionDate').value,
