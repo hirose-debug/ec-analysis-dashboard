@@ -975,11 +975,18 @@ function loadTrendData() {
     
     displayActions(relevantActions);
     
-    document.getElementById('viewToggleContainer').style.display = 'block';
-    document.getElementById('chartContainer').style.display = 'block';
-    document.getElementById('chartContainer2').style.display = 'block';
-    document.getElementById('chartContainer3').style.display = 'block';
-    document.getElementById('trendTableContainer').style.display = 'block';
+    // 安全に要素を表示
+    const viewToggle = document.getElementById('viewToggleContainer');
+    const chart1 = document.getElementById('chartContainer');
+    const chart2 = document.getElementById('chartContainer2');
+    const chart3 = document.getElementById('chartContainer3');
+    const table = document.getElementById('trendTableContainer');
+    
+    if (viewToggle) viewToggle.style.display = 'block';
+    if (chart1) chart1.style.display = 'block';
+    if (chart2) chart2.style.display = 'block';
+    if (chart3) chart3.style.display = 'block';
+    if (table) table.style.display = 'block';
     
     renderCharts(filtered, relevantActions);
     renderTrendTable(filtered, relevantActions);
