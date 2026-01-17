@@ -194,12 +194,12 @@
                 </div>
                 <div style="overflow-x: auto;">
                     <table id="dataTable">
-                        <thead>
-                            <tr>
-                                <th>日付</th><th>モール</th><th>SKU</th><th>商品名</th>
-                                <th>アクセス数</th><th>売上</th><th>注文数</th><th>CVR</th>
-                            </tr>
-                        </thead>
+ <thead>
+    <tr>
+        <th>実施日</th><th>モール</th><th>SKU</th>
+        <th>カテゴリ</th><th>施策内容</th><th>期待効果</th><th>削除</th>
+    </tr>
+</thead>
                         <tbody id="tableBody">
                             <tr>
                                 <td colspan="8" class="empty-state">
@@ -1169,24 +1169,50 @@
             await autoSync();
         }
 
-        function updateActionsTable() {
-            const tbody = document.getElementById('actionsTableBody');
-            if (actionsData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📋</div><p>施策を記録してください</p></td></tr>`;
-                return;
-            }
-            const sorted = [...actionsData].sort((a, b) => new Date(b.date) - new Date(a.date));
-            tbody.innerHTML = sorted.map(action => `
-                <tr>
-                    <td>${action.date}</td>
-                    <td><span class="mall-badge ${action.mall}">${action.mall}</span></td>
-                    <td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600;">${action.sku}</td>
-                    <td><span style="display: inline-block; padding: 0.25rem 0.75rem; background: var(--warning); color: white; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">${action.category}</span></td>
-                    <td>${action.content}</td>
-                    <td>${action.expected}</td>
-                </tr>
-            `).join('');
-        }
+ function updateActionsTable() {
+    const tbody = document.getElementById('actionsTableBody');
+    if (actionsData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-state-icon">📋</div><p>施策を記録してください</p></td></tr>`;
+        return;
+    }
+    const sorted = [...actionsData].sort((a, b) => new Date(b.date) - new Date(a.date));
+    tbody.innerHTML = sorted.map((action, index) => {
+        const originalIndex = actionsData.findIndex(a => a.id === action.id);
+        return `
+            <tr>
+                <td>${action.date}</td>
+                <td><span class="mall-badge ${action.mall}">${action.mall}</span></td>
+                <td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600;">${action.sku}</td>
+                <td><span style="display: inline-block; padding: 0.25rem 0.75rem; background: var(--warning); color: white; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">${action.category}</span></td>
+                <td>${action.content}</td>
+                <td>${action.expected}</td>
+                <td><button class="delete-btn" onclick="deleteAction(${originalIndex})">🗑️</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+let deleteTargetIndex = -1;
+
+function deleteAction(index) {
+    deleteTargetIndex = index;
+    document.getElementById('deleteModal').classList.add('show');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    deleteTargetIndex = -1;
+}
+
+async function confirmDelete() {
+    if (deleteTargetIndex >= 0 && deleteTargetIndex < actionsData.length) {
+        actionsData.splice(deleteTargetIndex, 1);
+        updateActionsTable();
+        showNotification('✅ 施策記録を削除しました');
+        closeDeleteModal();
+        await autoSync();
+    }
+}
 
         function showNotification(message, isError = false) {
             const notification = document.getElementById('notification');
@@ -1210,5 +1236,19 @@
             }
         });
     </script>
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <h3 class="modal-title">🗑️ 施策記録を削除</h3>
+            <div class="modal-content">
+                この施策記録を削除してもよろしいですか？<br>
+                この操作は取り消せません。
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">キャンセル</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">削除する</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
