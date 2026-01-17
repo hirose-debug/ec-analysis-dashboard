@@ -1113,36 +1113,46 @@
             });
         }
 
-        function exportTrendData() {
-            if (currentTrendData.length === 0) {
-                showNotification('エクスポートするデータがありません', true);
-                return;
-            }
-            
-            const csv = [
-                ['商品名', currentProductName],
-                ['SKU', currentSKU],
-                ['モール', currentMall],
-                [''],
-                ['日付', 'アクセス数', '売上', '注文数', 'CVR(%)', '客単価'],
-                ...currentTrendData.map(d => [
-                    d.date,
-                    d.access,
-                    d.sales,
-                    d.orders,
-                    d.cvr.toFixed(2),
-                    d.unitPrice
-                ])
-            ].map(row => row.join(',')).join('\n');
-            
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `日次推移_${currentSKU}_${currentMall}_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-            
-            showNotification('✅ 日次推移データをエクスポートしました');
-        }
+function exportTrendData() {
+    if (currentTrendData.length === 0) {
+        showNotification('エクスポートするデータがありません', true);
+        return;
+    }
+    
+    const relevantActions = actionsData.filter(a => 
+        a.sku === currentSKU && (a.mall === currentMall || a.mall === '全サイト')
+    );
+    
+    const csv = [
+        ['商品名', currentProductName],
+        ['SKU', currentSKU],
+        ['モール', currentMall],
+        [''],
+        ['日付', 'アクセス数', '売上', '注文数', 'CVR(%)', '客単価', '施策カテゴリ', '施策内容', '期待効果'],
+        ...currentTrendData.map(d => {
+            const action = relevantActions.find(a => a.date === d.date);
+            return [
+                d.date,
+                d.access,
+                d.sales,
+                d.orders,
+                d.cvr.toFixed(2),
+                d.unitPrice,
+                action ? action.category : '',
+                action ? action.content : '',
+                action ? action.expected : ''
+            ];
+        })
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `日次推移_${currentSKU}_${currentMall}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    showNotification('✅ 日次推移データ（施策情報付き）をエクスポートしました');
+}
 
         async function addAction() {
             const action = {
