@@ -82,6 +82,35 @@
         .notification.error { border-left-color: var(--danger); }
         @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         input[type="file"] { display: none; }
+        input[type="file"] { display: none; }
+        
+        .view-content {
+            display: none;
+        }
+
+        .view-content.active {
+            display: block;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--bg);
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-group .btn.active {
+            background: var(--accent);
+        }
+    </style>
+</head>
     </style>
 </head>
 <body>
@@ -206,7 +235,7 @@
             </div>
         </div>
 
-        <div id="tab-trend" class="tab-content">
+<div id="tab-trend" class="tab-content">
             <div class="search-section">
                 <h2 style="margin-bottom: 1.5rem;">🔍 日次推移分析</h2>
                 <div class="form-grid">
@@ -223,6 +252,59 @@
                         </select>
                     </div>
                 </div>
+                <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
+            </div>
+
+            <div class="chart-container" id="viewToggleContainer" style="display: none;">
+                <div class="btn-group">
+                    <button class="btn active" onclick="switchView('chart')">📊 グラフ表示</button>
+                    <button class="btn" onclick="switchView('table')">📋 表形式表示</button>
+                </div>
+            </div>
+
+            <div id="productActions" style="display: none;"></div>
+
+            <div id="chartView" class="view-content active">
+                <div class="chart-container" id="chartContainer" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 id="chartProductName" style="font-size: 1.5rem; font-weight: 700;">商品名</h3>
+                    </div>
+                    <canvas id="salesChart" height="80"></canvas>
+                </div>
+
+                <div class="chart-container" id="chartContainer2" style="display: none;">
+                    <canvas id="cvrChart" height="80"></canvas>
+                </div>
+
+                <div class="chart-container" id="chartContainer3" style="display: none;">
+                    <canvas id="accessChart" height="80"></canvas>
+                </div>
+            </div>
+
+            <div id="tableView" class="view-content">
+                <div class="data-table" id="trendTableContainer" style="display: none;">
+                    <div class="table-header">
+                        <h2 id="trendTableTitle">日次データ</h2>
+                        <button class="btn btn-secondary" onclick="exportTrendData()">📥 CSVエクスポート</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>日付</th>
+                                    <th>アクセス数</th>
+                                    <th>売上</th>
+                                    <th>注文数</th>
+                                    <th>CVR(%)</th>
+                                    <th>客単価</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trendTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
                 <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
             </div>
         </div>
@@ -811,7 +893,24 @@ if (token && token.access_token) {
                     <td>${p.cvr.toFixed(2)}%</td>
                 </tr>
             `).join('');
-        }
+    
+let salesChart, cvrChart, accessChart;
+let currentTrendData = [];
+let currentProductName = '';
+let currentSKU = '';
+let currentMall = '';
+let currentView = 'chart';
+
+function switchView(view) {
+    currentView = view;
+    
+    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    document.querySelectorAll('.view-content').forEach(content => content.classList.remove('active'));
+    document.getElementById(`${view}View`).classList.add('active');
+}
+
 function loadTrendData() {
     const sku = document.getElementById('trendSKU').value.trim();
     const mall = document.getElementById('trendMall').value;
@@ -831,128 +930,244 @@ function loadTrendData() {
     filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
     
     const productName = filtered[0].name;
+    currentTrendData = filtered;
+    currentProductName = productName;
+    currentSKU = sku;
+    currentMall = mall;
     
-    // グラフコンテナを表示
-    const chartSection = document.createElement('div');
-    chartSection.className = 'chart-container';
-    chartSection.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-            <h3 style="font-size: 1.5rem; font-weight: 700;">${productName}</h3>
-            <button class="btn btn-secondary" onclick="exportTrendData()">📥 CSVエクスポート</button>
-        </div>
-        <canvas id="salesChart" height="80"></canvas>
-    `;
+    const relevantActions = actionsData.filter(a => 
+        a.sku === sku && (a.mall === mall || a.mall === '全サイト')
+    );
     
-    // 既存のグラフがあれば削除
-    const existingChart = document.querySelector('.chart-container');
-    if (existingChart) {
-        existingChart.remove();
+    displayActions(relevantActions);
+    
+    document.getElementById('viewToggleContainer').style.display = 'block';
+    document.getElementById('chartContainer').style.display = 'block';
+    document.getElementById('chartContainer2').style.display = 'block';
+    document.getElementById('chartContainer3').style.display = 'block';
+    document.getElementById('trendTableContainer').style.display = 'block';
+    
+    renderCharts(filtered, relevantActions);
+    renderTrendTable(filtered, relevantActions);
+    showNotification('✅ 日次推移を表示しました');
+}
+
+function displayActions(actions) {
+    const container = document.getElementById('productActions');
+    
+    if (actions.length === 0) {
+        container.style.display = 'none';
+        return;
     }
     
-    // グラフを追加
-    const trendTab = document.getElementById('tab-trend');
-    trendTab.appendChild(chartSection);
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div class="search-section">
+            <h3 style="margin-bottom: 1rem;">📌 この商品の施策履歴</h3>
+            ${actions.map(a => `
+                <div style="position: relative; padding: 0.5rem 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border-left: 4px solid var(--warning); border-radius: 8px;">
+                    <strong>${a.date}</strong> - ${a.category}: ${a.content}
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderTrendTable(data, actions) {
+    const tbody = document.getElementById('trendTableBody');
+    document.getElementById('trendTableTitle').textContent = currentProductName;
     
-    // データ準備
-    const dates = filtered.map(d => d.date);
-    const sales = filtered.map(d => d.sales);
-    const access = filtered.map(d => d.access);
-    const cvr = filtered.map(d => d.cvr);
+    tbody.innerHTML = data.map(d => {
+        const hasAction = actions.find(a => a.date === d.date);
+        const actionStyle = hasAction ? 'background: rgba(245, 158, 11, 0.1);' : '';
+        
+        return `
+            <tr style="${actionStyle}">
+                <td>
+                    ${d.date}
+                    ${hasAction ? '<br><span style="display: inline-block; padding: 0.25rem 0.5rem; background: var(--warning); color: white; border-radius: 6px; font-size: 0.7rem;">📌 ' + hasAction.category + '</span>' : ''}
+                </td>
+                <td>${d.access.toLocaleString()}</td>
+                <td>¥${d.sales.toLocaleString()}</td>
+                <td>${d.orders.toLocaleString()}</td>
+                <td>${d.cvr.toFixed(2)}%</td>
+                <td>¥${d.unitPrice.toLocaleString()}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderCharts(data, actions) {
+    const dates = data.map(d => d.date);
+    const sales = data.map(d => d.sales);
+    const cvr = data.map(d => d.cvr);
+    const access = data.map(d => d.access);
     
-    // グラフ描画
-    const ctx = document.getElementById('salesChart').getContext('2d');
-    new Chart(ctx, {
+    document.getElementById('chartProductName').textContent = currentProductName;
+    
+    const actionAnnotations = actions.map(action => ({
+        type: 'line',
+        xMin: action.date,
+        xMax: action.date,
+        borderColor: 'rgb(245, 158, 11)',
+        borderWidth: 3,
+        borderDash: [5, 5],
+        label: {
+            content: `📌 ${action.category}`,
+            enabled: true,
+            position: 'start',
+            backgroundColor: 'rgb(245, 158, 11)',
+            color: 'white',
+            font: {
+                size: 11
+            }
+        }
+    }));
+    
+    if (salesChart) salesChart.destroy();
+    salesChart = new Chart(document.getElementById('salesChart'), {
         type: 'line',
         data: {
             labels: dates,
-            datasets: [
-                {
-                    label: '売上（円）',
-                    data: sales,
-                    borderColor: 'rgb(6, 182, 212)',
-                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                    yAxisID: 'y',
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'アクセス数',
-                    data: access,
-                    borderColor: 'rgb(99, 102, 241)',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    yAxisID: 'y1',
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'CVR（%）',
-                    data: cvr,
-                    borderColor: 'rgb(16, 185, 129)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    yAxisID: 'y2',
-                    tension: 0.4,
-                    fill: true
-                }
-            ]
+            datasets: [{
+                label: '売上（円）',
+                data: sales,
+                borderColor: 'rgb(6, 182, 212)',
+                backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
         },
         options: {
             responsive: true,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
             plugins: {
                 title: {
                     display: true,
-                    text: '日次推移分析',
+                    text: '売上推移',
                     font: { size: 16, weight: 'bold' }
                 },
-                legend: {
-                    display: true,
-                    position: 'top'
-                }
+                legend: { display: true }
             },
             scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: '売上（円）'
-                    },
+                y: { 
+                    beginAtZero: true,
                     ticks: {
                         callback: function(value) {
                             return '¥' + value.toLocaleString();
                         }
                     }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'アクセス数'
-                    },
-                    grid: {
-                        drawOnChartArea: false,
-                    },
-                },
-                y2: {
-                    type: 'linear',
-                    display: false,
-                    position: 'right',
                 }
             }
         }
     });
     
-    showNotification('✅ 日次推移を表示しました');
+    if (cvrChart) cvrChart.destroy();
+    cvrChart = new Chart(document.getElementById('cvrChart'), {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'CVR（%）',
+                data: cvr,
+                borderColor: 'rgb(16, 185, 129)',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'CVR推移',
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: { display: true }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(2) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    if (accessChart) accessChart.destroy();
+    accessChart = new Chart(document.getElementById('accessChart'), {
+        type: 'bar',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'アクセス数',
+                data: access,
+                backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                borderColor: 'rgb(99, 102, 241)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'アクセス数推移',
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: { display: true }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 function exportTrendData() {
-    showNotification('CSVエクスポート機能は準備中です');
+    if (currentTrendData.length === 0) {
+        showNotification('エクスポートするデータがありません', true);
+        return;
+    }
+    
+    const csv = [
+        ['商品名', currentProductName],
+        ['SKU', currentSKU],
+        ['モール', currentMall],
+        [''],
+        ['日付', 'アクセス数', '売上', '注文数', 'CVR(%)', '客単価'],
+        ...currentTrendData.map(d => [
+            d.date,
+            d.access,
+            d.sales,
+            d.orders,
+            d.cvr.toFixed(2),
+            d.unitPrice
+        ])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `日次推移_${currentSKU}_${currentMall}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    showNotification('✅ 日次推移データをエクスポートしました');
 }
     
         async function addAction() {
