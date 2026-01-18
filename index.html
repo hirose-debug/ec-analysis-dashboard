@@ -264,29 +264,31 @@
         </div>
 
 <div id="tab-trend" class="tab-content">
-    <div class="search-section">
-        <h2 style="margin-bottom: 1.5rem;">🔍 日次推移分析</h2>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label">SKU</label>
-                <input type="text" id="trendSKU" class="search-input" placeholder="例: 213-62">
+            <div class="search-section">
+                <h2 style="margin-bottom: 1.5rem;">🔍 日次推移分析</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">SKU</label>
+                        <input type="text" id="trendSKU" class="search-input" placeholder="例: 213-62">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">モール</label>
+                        <select id="trendMall" class="search-input">
+                            <option value="楽天">楽天</option>
+                            <option value="Yahoo">Yahoo</option>
+                            <option value="Amazon">Amazon</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
             </div>
-            <div class="form-group">
-                <label class="form-label">モール</label>
-                <select id="trendMall" class="search-input">
-                    <option value="楽天">楽天</option>
-                    <option value="Yahoo">Yahoo</option>
-                    <option value="Amazon">Amazon</option>
-                </select>
+
+            <div class="chart-container" id="viewToggleContainer" style="display: none;">
+                <div class="btn-group">
+                    <button class="btn active" onclick="switchView('chart')">📊 グラフ表示</button>
+                    <button class="btn" onclick="switchView('table')">📋 表形式表示</button>
+                </div>
             </div>
-        </div>
-        
-        <!-- 期間フィルター追加 -->
-        
-        <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
-    </div>
-    
-    <!-- 以下は既存のコード -->
 
             <div id="productActions" style="display: none;"></div>
 
@@ -331,7 +333,6 @@
                 </div>
             </div>
         </div>
-
         <div id="tab-actions" class="tab-content">
             <div class="search-section">
                 <h2 style="margin-bottom: 1.5rem;">📝 施策記録</h2>
