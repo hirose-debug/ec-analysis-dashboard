@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECモール商品分析ダッシュボード</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #0F172A; --secondary: #1E293B; --accent: #06B6D4;
+            --accent-hover: #0891B2; --success: #10B981; --warning: #F59E0B;
+            --danger: #EF4444; --bg: #F8FAFC; --card: #FFFFFF;
+            --border: #E2E8F0; --text: #0F172A; --text-muted: #64748B;
+            --rakuten: #BF0000; --yahoo: #0050CC; --amazon: #FF9900;
+        }
+        body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 2rem; margin-bottom: 2rem; border-radius: 16px; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15); position: relative; }
+        h1 { font-size: 2.5rem; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+        .subtitle { color: #CBD5E1; font-size: 1.1rem; }
+        .google-drive-status { position: absolute; top: 2rem; right: 2rem; display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+        .sync-status { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+        .sync-status.connected { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        .sync-status.disconnected { background: rgba(100, 116, 139, 0.2); color: #CBD5E1; }
+        .user-info { font-size: 0.75rem; color: #CBD5E1; }
+        .google-btn { padding: 0.75rem 1.5rem; background: white; color: var(--primary); border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem; }
+        .google-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .upload-section { background: var(--card); padding: 2.5rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); border: 2px dashed var(--border); }
+        .mall-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+        .mall-option { padding: 1.5rem; border: 3px solid var(--border); border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s ease; background: white; }
+        .mall-option:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); }
+        .mall-option.selected { border-color: var(--accent); background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%); }
+        .mall-option.rakuten.selected { border-color: var(--rakuten); background: linear-gradient(135deg, rgba(191, 0, 0, 0.1) 0%, rgba(191, 0, 0, 0.05) 100%); }
+        .mall-option.yahoo.selected { border-color: var(--yahoo); background: linear-gradient(135deg, rgba(0, 80, 204, 0.1) 0%, rgba(0, 80, 204, 0.05) 100%); }
+        .mall-option.amazon.selected { border-color: var(--amazon); background: linear-gradient(135deg, rgba(255, 153, 0, 0.1) 0%, rgba(255, 153, 0, 0.05) 100%); }
+        .btn { display: inline-block; padding: 0.875rem 2rem; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3); }
+        .btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--secondary); }
+        .btn-success { background: var(--success); }
+        .nav-tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; background: var(--card); padding: 0.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        .nav-tab { flex: 1; padding: 1rem; background: transparent; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; text-align: center; font-weight: 600; font-size: 1rem; color: var(--text-muted); }
+        .nav-tab.active { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%); color: white; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .card { background: var(--card); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        .card-title { font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 0.5rem; }
+        .card-value { font-size: 2rem; font-weight: 900; font-family: 'IBM Plex Mono', monospace; color: var(--primary); }
+        .data-table { background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); margin-bottom: 2rem; }
+        .table-header { padding: 1.5rem; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: var(--bg); }
+        th { padding: 1rem; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 2px solid var(--border); }
+        td { padding: 1rem; border-bottom: 1px solid var(--border); }
+        tbody tr:hover { background: rgba(6, 182, 212, 0.05); }
+        .mall-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .mall-badge.楽天 { background: rgba(191, 0, 0, 0.1); color: var(--rakuten); }
+        .mall-badge.Yahoo { background: rgba(0, 80, 204, 0.1); color: var(--yahoo); }
+        .mall-badge.Amazon { background: rgba(255, 153, 0, 0.1); color: var(--amazon); }
+        .success-box { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%); border-left: 4px solid var(--success); padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
+        .success-box h4 { color: var(--success); margin-bottom: 0.5rem; }
+        .info-box { background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%); border-left: 4px solid var(--accent); padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
+        .info-box h4 { color: var(--accent); margin-bottom: 0.5rem; }
+        .warning-box { background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border-left: 4px solid var(--warning); padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
+        .warning-box h4 { color: var(--warning); margin-bottom: 0.5rem; }
+        .search-section { background: var(--card); padding: 2rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        .search-input, select, input[type="date"], textarea { width: 100%; padding: 1rem 1.5rem; font-size: 1rem; border: 2px solid var(--border); border-radius: 12px; transition: all 0.3s ease; font-family: 'Noto Sans JP', sans-serif; }
+        .search-input:focus, select:focus, input[type="date"]:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
+        .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+        .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.3; }
+        .notification { position: fixed; top: 2rem; right: 2rem; padding: 1rem 1.5rem; background: var(--card); border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15); border-left: 4px solid var(--success); display: none; z-index: 1000; max-width: 400px; }
+        .notification.show { display: block; animation: slideIn 0.3s ease; }
+        .notification.error { border-left-color: var(--danger); }
+        @keyframes s
+        lideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        input[type="file"] { display: none; }
+        .chart-container { background: var(--card); padding: 2rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        .view-content { display: none; }
+        .view-content.active { display: block; }
+        .btn-group { display: flex; gap: 0.5rem; background: var(--bg); padding: 0.5rem; border-radius: 8px; }
+        .btn-group .btn { flex: 1; padding: 0.5rem 1rem; font-size: 0.875rem; }
+        .btn-group .btn.active { background: var(--accent); }
+        .delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.2rem; padding: 0.5rem; transition: all 0.2s ease; }
+        .delete-btn:hover { transform: scale(1.2); }
+        .modal-overlay { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            background: rgba(0, 0, 0, 0.5); 
+            z-index: 2000; 
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { 
+            display: flex !important;
+        }
+        .modal { 
+            background: var(--card); 
+            border-radius: 16px; 
+            padding: 2rem; 
+            max-width: 500px; 
+            width: 90%; 
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); 
+            animation: slideUp 0.3s ease; 
+        }
+        @keyframes slideUp { 
+            from { transform: translateY(50px); opacity: 0; } 
+            to { transform: translateY(0); opacity: 1; } 
+        }
+        .modal-title { 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            margin-bottom: 1rem; 
+            color: var(--text); 
+        }
+        .modal-content { 
+            color: var(--text-muted); 
+            margin-bottom: 2rem; 
+            line-height: 1.6; 
+        }
+        .modal-buttons { 
+            display: flex; 
+            gap: 1rem; 
+            justify-content: flex-end; 
+        }
+        .modal-buttons .btn { 
+            flex: 1; 
+        }
+        /* 期間フィルター用スタイル */
+        .period-filter {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .period-filter-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text);
+        }
+        .period-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .period-btn {
+            padding: 0.625rem 1.25rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--card);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .period-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .period-btn.active {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+        }
+        .custom-date-inputs {
+            display: none;
+            gap: 0.75rem;
+            align-items: center;
+            margin-left: 1rem;
+        }
+        .custom-date-inputs.show {
+            display: flex;
+        }
+        .custom-date-inputs input[type="date"] {
+            padding: 0.5rem 0.75rem;
+            width: auto;
+        }
+        .custom-date-inputs .date-separator {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .period-display {
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            background: rgba(6, 182, 212, 0.1);
+            border-radius: 6px;
+            display: inline-block;
+        }
+        @media (max-width: 768px) {
+            .period-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .custom-date-inputs {
+                margin-left: 0;
+                margin-top: 0.75rem;
+                flex-direction: column;
+            }
+            .custom-date-inputs.show {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 ECモール商品分析ダッシュボード</h1>
+            <p class="subtitle">楽天・Yahoo・Amazon 統合管理システム（共有ドライブ対応）</p>
+            <div class="google-drive-status">
+                <div class="sync-status disconnected" id="syncStatus">
+                    <span>☁️</span>
+                    <span id="syncStatusText">未接続</span>
+                </div>
+                <div class="user-info" id="userInfo"></div>
+                <button class="google-btn" id="googleSignInBtn" onclick="handleAuthClick()">
+                    <span>🔐</span>
+                    <span>Googleドライブ連携</span>
+                </button>
+                <button class="google-btn" id="googleSignOutBtn" onclick="handleSignoutClick()" style="display: none;">
+                    <span>🔓</span>
+                    <span>連携解除</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('overview')">📈 概要</button>
+            <button class="nav-tab" onclick="switchTab('trend')">📉 日次推移分析</button>
+            <button class="nav-tab" onclick="switchTab('actions')">📝 施策記録</button>
+        </div>
+
+        <div id="tab-overview" class="tab-content active">
+            <div class="upload-section">
+                <h3 style="margin-bottom: 1.5rem; text-align: center; font-size: 1.5rem;">CSVファイルをアップロード</h3>
+                <div class="success-box">
+                    <h4>✅ 共有ドライブ対応</h4>
+                    <p style="line-height: 1.8;"><strong>従業員（<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b4dcddc6dbc4c6db84858687f4d3d9d5ddd89ad7dbd9">[email&#160;protected]</a>）</strong>がアップロードしたCSVデータも、<br><strong>管理者アカウント</strong>で自動的に確認できます。</p>
+                </div>
+                <div class="info-box">
+                    <h4>📌 アップロード手順</h4>
+                    <ol style="margin-left: 1.5rem; line-height: 1.8;">
+                        <li><strong>初回のみ:</strong> 右上の「Googleドライブ連携」ボタンをクリック</li>
+                        <li>下のモール選択ボタンからモールを選択</li>
+                        <li>該当モールのCSVファイルをアップロード</li>
+                        <li>自動的に共有Googleドライブに保存</li>
+                    </ol>
+                </div>
+                <div class="warning-box">
+                    <h4>⚠️ 重要</h4>
+                    <ul style="margin-left: 1.5rem; line-height: 1.8;">
+                        <li><strong>楽天:</strong> 1日単位のデータのみ対応（日付は自動抽出）</li>
+                        <li><strong>Yahoo・Amazon:</strong> アップロード時に日付を入力してください</li>
+                        <li><strong>☁️ 自動同期:</strong> すべてのデータが共有ドライブに保存されます</li>
+                    </ul>
+                </div>
+                <div class="mall-selector">
+                    <div class="mall-option rakuten" onclick="selectMall('rakuten')">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🔴</div>
+                        <div style="font-size: 1.25rem; font-weight: 700;">楽天</div>
+                    </div>
+                    <div class="mall-option yahoo" onclick="selectMall('yahoo')">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🔵</div>
+                        <div style="font-size: 1.25rem; font-weight: 700;">Yahoo</div>
+                    </div>
+                    <div class="mall-option amazon" onclick="selectMall('amazon')">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🟠</div>
+                        <div style="font-size: 1.25rem; font-weight: 700;">Amazon</div>
+                    </div>
+                </div>
+                <div id="dateInputSection" style="display: none; margin-bottom: 2rem;">
+                    <div class="form-group">
+                        <label class="form-label">📅 データの日付を入力してください</label>
+                        <input type="date" id="uploadDate" class="search-input">
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 3rem; border: 2px dashed var(--border); border-radius: 12px; cursor: pointer;" onclick="document.getElementById('csvFile').click()">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">📤</div>
+                    <p style="color: var(--text-muted); margin-bottom: 1.5rem;" id="uploadInstruction">まず右上の「Googleドライブ連携」をクリックしてください</p>
+                    <input type="file" id="csvFile" accept=".csv" multiple disabled>
+                    <button class="btn" id="uploadBtn" disabled>ファイルを選択</button>
+                </div>
+            </div>
+            <div class="dashboard" id="dashboard">
+                <div class="card">
+                    <div class="card-title">総アクセス数</div>
+                    <div class="card-value" id="totalAccess">0</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">総売上</div>
+                    <div class="card-value" id="totalSales">¥0</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">総注文数</div>
+                    <div class="card-value" id="totalOrders">0</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">平均CVR</div>
+                    <div class="card-value" id="avgCVR">0.00%</div>
+                </div>
+            </div>
+            <div class="data-table">
+                <div class="table-header">
+                    <h2>商品データ一覧</h2>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="dataTable">
+ <thead>
+    <tr>
+        <th>実施日</th><th>モール</th><th>SKU</th>
+        <th>カテゴリ</th><th>施策内容</th><th>期待効果</th><th>削除</th>
+    </tr>
+</thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="8" class="empty-state">
+                                    <div class="empty-state-icon">📂</div>
+                                    <p>右上の「Googleドライブ連携」をクリックしてデータを読み込んでください</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+<div id="tab-trend" class="tab-content">
+            <div class="search-section">
+                <h2 style="margin-bottom: 1.5rem;">🔍 日次推移分析</h2>
+                
+                <!-- 期間フィルター -->
+                <div class="period-filter">
+                    <label class="period-filter-label">📅 表示期間</label>
+                    <div class="period-buttons">
+                        <button class="period-btn active" data-period="thisMonth" onclick="setPeriodFilter('thisMonth', this)">今月</button>
+                        <button class="period-btn" data-period="last2Months" onclick="setPeriodFilter('last2Months', this)">過去2ヶ月</button>
+                        <button class="period-btn" data-period="custom" onclick="setPeriodFilter('custom', this)">カスタム</button>
+                        <div class="custom-date-inputs" id="customDateInputs">
+                            <input type="date" id="filterStartDate">
+                            <span class="date-separator">〜</span>
+                            <input type="date" id="filterEndDate">
+                            <button class="btn" onclick="applyCustomDateFilter()" style="padding: 0.5rem 1rem;">適用</button>
+                        </div>
+                    </div>
+                    <div class="period-display" id="periodDisplay">表示期間: 今月</div>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">SKU</label>
+                        <input type="text" id="trendSKU" class="search-input" placeholder="例: 213-62">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">モール</label>
+                        <select id="trendMall" class="search-input">
+                            <option value="楽天">楽天</option>
+                            <option value="Yahoo">Yahoo</option>
+                            <option value="Amazon">Amazon</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn" onclick="loadTrendData()">📊 推移を表示</button>
+            </div>
+
+            <div class="chart-container" id="viewToggleContainer" style="display: none;">
+                <div class="btn-group">
+                    <button class="btn active" onclick="switchView('chart')">📊 グラフ表示</button>
+                    <button class="btn" onclick="switchView('table')">📋 表形式表示</button>
+                </div>
+            </div>
+
+            <div id="productActions" style="display: none;"></div>
+
+            <div id="chartView" class="view-content active">
+                <div class="chart-container" id="chartContainer" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 id="chartProductName" style="font-size: 1.5rem; font-weight: 700;">商品名</h3>
+                    </div>
+                    <canvas id="salesChart" height="80"></canvas>
+                </div>
+
+                <div class="chart-container" id="chartContainer2" style="display: none;">
+                    <canvas id="cvrChart" height="80"></canvas>
+                </div>
+
+                <div class="chart-container" id="chartContainer3" style="display: none;">
+                    <canvas id="accessChart" height="80"></canvas>
+                </div>
+            </div>
+
+            <div id="tableView" class="view-content">
+                <div class="data-table" id="trendTableContainer" style="display: none;">
+                    <div class="table-header">
+                        <h2 id="trendTableTitle">日次データ</h2>
+                        <button class="btn btn-secondary" onclick="exportTrendData()">📥 CSVエクスポート</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>日付</th>
+                                    <th>アクセス数</th>
+                                    <th>売上</th>
+                                    <th>注文数</th>
+                                    <th>CVR(%)</th>
+                                    <th>客単価</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trendTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="tab-actions" class="tab-content">
+            <div class="search-section">
+                <h2 style="margin-bottom: 1.5rem;">📝 施策記録</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">実施日</label>
+                        <input type="date" id="actionDate" class="search-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">モール</label>
+                        <select id="actionMall" class="search-input">
+                            <option value="楽天">楽天</option>
+                            <option value="Yahoo">Yahoo</option>
+                            <option value="Amazon">Amazon</option>
+                            <option value="全サイト">全サイト</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SKU</label>
+                        <input type="text" id="actionSKU" class="search-input" placeholder="例: 213-62">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">施策カテゴリ</label>
+                    <select id="actionCategory" class="search-input">
+                        <option value="画像改善">画像改善</option>
+                        <option value="ページ改善">ページ改善</option>
+                        <option value="SEO対策">SEO対策</option>
+                        <option value="価格調整">価格調整</option>
+                        <option value="広告施策">広告施策</option>
+                        <option value="在庫調整">在庫調整</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">施策内容</label>
+                    <textarea id="actionContent" class="search-input" rows="3" placeholder="具体的な施策内容を記入"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">期待効果</label>
+                    <input type="text" id="actionExpected" class="search-input" placeholder="例: CVR 0.5%向上">
+                </div>
+                <button class="btn btn-success" onclick="addAction()">💾 施策を記録</button>
+            </div>
+            <div class="data-table">
+                <div class="table-header">
+                    <h2>施策記録一覧</h2>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="actionsTable">
+                        <thead>
+                            <tr>
+                                <th>実施日</th><th>モール</th><th>SKU</th>
+                                <th>カテゴリ</th><th>施策内容</th><th>期待効果</th>
+                            </tr>
+                        </thead>
+                        <tbody id="actionsTableBody">
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    <div class="empty-state-icon">📋</div>
+                                    <p>施策を記録してください</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="notification" id="notification"></div>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        const CLIENT_ID = '119734659150-4rvc25of2thd8k59emteo8ov55d8je0n.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyBjzYlh1bI9HJrw0Fhw35WA0U7vW0xGWCQ';
+        const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const SHARED_DRIVE_ID = '0AA8ztWU-h8GRUk9PVA';
+        const DATA_FILE_NAME = 'ec_analysis_data.json';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+        let driveFileId = null;
+        let currentUserEmail = '';
+        let dailyData = [];
+        let actionsData = [];
+        let uploadHistory = [];
+        let selectedMall = null;
+        let salesChart, cvrChart, accessChart;
+        let currentTrendData = [];
+        let currentProductName = '';
+        let currentSKU = '';
+        let currentMall = '';
+        let currentView = 'chart';
+
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            if (!API_KEY) {
+                console.log('Google API Key not configured');
+                return;
+            }
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: DISCOVERY_DOCS,
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+        }
+
+        function gisLoaded() {
+            if (!CLIENT_ID) {
+                console.log('Google Client ID not configured');
+                return;
+            }
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '',
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited && CLIENT_ID && API_KEY) {
+                document.getElementById('googleSignInBtn').disabled = false;
+            }
+        }
+
+        function handleAuthClick() {
+            if (!CLIENT_ID || !API_KEY) {
+                showNotification('⚠️ Google API設定が必要です', true);
+                return;
+            }
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                
+                const token = gapi.client.getToken();
+                if (token && token.access_token) {
+                    try {
+                        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                            headers: {
+                                'Authorization': `Bearer ${token.access_token}`
+                            }
+                        });
+                        const userInfo = await response.json();
+                        currentUserEmail = userInfo.email || 'unknown@example.com';
+                    } catch (err) {
+                        console.log('ユーザー情報取得エラー:', err);
+                        currentUserEmail = 'user@example.com';
+                    }
+                } else {
+                    currentUserEmail = 'user@example.com';
+                }
+                
+                document.getElementById('googleSignInBtn').style.display = 'none';
+                document.getElementById('googleSignOutBtn').style.display = 'block';
+                document.getElementById('syncStatus').classList.remove('disconnected');
+                document.getElementById('syncStatus').classList.add('connected');
+                document.getElementById('syncStatusText').textContent = '接続済み';
+                document.getElementById('userInfo').textContent = `ログイン中: ${currentUserEmail}`;
+                document.getElementById('csvFile').disabled = false;
+                document.getElementById('uploadBtn').disabled = false;
+                document.getElementById('uploadInstruction').textContent = 'モールを選択してCSVファイルをアップロードしてください';
+                
+                showNotification('✅ Googleドライブに接続しました');
+                await findOrCreateDataFile();
+                await loadFromGoogleDrive();
+            };
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        function handleSignoutClick() {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken('');
+                document.getElementById('googleSignInBtn').style.display = 'block';
+                document.getElementById('googleSignOutBtn').style.display = 'none';
+                document.getElementById('syncStatus').classList.remove('connected');
+                document.getElementById('syncStatus').classList.add('disconnected');
+                document.getElementById('syncStatusText').textContent = '未接続';
+                document.getElementById('userInfo').textContent = '';
+                driveFileId = null;
+                currentUserEmail = '';
+                showNotification('✅ Googleドライブから切断しました');
+            }
+        }
+
+        async function findOrCreateDataFile() {
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: `name='${DATA_FILE_NAME}' and '${SHARED_DRIVE_ID}' in parents and trashed=false`,
+                    corpora: 'drive',
+                    driveId: SHARED_DRIVE_ID,
+                    includeItemsFromAllDrives: true,
+                    supportsAllDrives: true,
+                    fields: 'files(id, name)',
+                });
+                const files = response.result.files;
+                if (files && files.length > 0) {
+                    driveFileId = files[0].id;
+                    console.log('既存ファイル発見:', driveFileId);
+                } else {
+                    const initialData = {
+                        dailyData: [],
+                        actions: [],
+                        uploadHistory: [],
+                        lastSync: new Date().toISOString()
+                    };
+                    const file = new Blob([JSON.stringify(initialData, null, 2)], {type: 'application/json'});
+                    const metadata = {
+                        name: DATA_FILE_NAME,
+                        mimeType: 'application/json',
+                        parents: [SHARED_DRIVE_ID]
+                    };
+                    const form = new FormData();
+                    form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+                    form.append('file', file);
+                    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true', {
+                        method: 'POST',
+                        headers: new Headers({'Authorization': 'Bearer ' + gapi.client.getToken().access_token}),
+                        body: form
+                    });
+                    const result = await response.json();
+                    driveFileId = result.id;
+                    console.log('新規ファイル作成:', driveFileId);
+                }
+            } catch (err) {
+                console.error('ファイル検索/作成エラー:', err);
+                showNotification('❌ 共有ドライブへのアクセスに失敗しました', true);
+            }
+        }
+
+        async function loadFromGoogleDrive() {
+            if (!driveFileId) return;
+            try {
+                const response = await gapi.client.drive.files.get({
+                    fileId: driveFileId,
+                    alt: 'media',
+                    supportsAllDrives: true
+                });
+                const cloudData = JSON.parse(response.body);
+                dailyData = cloudData.dailyData || [];
+                actionsData = cloudData.actions || [];
+                uploadHistory = cloudData.uploadHistory || [];
+                updateDashboard();
+                updateTable();
+                updateActionsTable();
+                showNotification('✅ 共有ドライブからデータを読み込みました');
+            } catch (err) {
+                console.error('データ読み込みエラー:', err);
+                showNotification('⚠️ データの読み込みに失敗しました', true);
+            }
+        }
+
+        async function syncToGoogleDrive() {
+            if (!driveFileId) return;
+            try {
+                const data = {
+                    dailyData: dailyData,
+                    actions: actionsData,
+                    uploadHistory: uploadHistory,
+                    lastSync: new Date().toISOString(),
+                    lastSyncBy: currentUserEmail
+                };
+                const response = await gapi.client.request({
+                    path: `/upload/drive/v3/files/${driveFileId}?supportsAllDrives=true`,
+                    method: 'PATCH',
+                    params: {
+                        uploadType: 'media'
+                    },
+                    body: JSON.stringify(data)
+                });
+                console.log('データ同期完了:', new Date().toLocaleString(), 'by', currentUserEmail);
+                const statusText = document.getElementById('syncStatusText');
+                const originalText = statusText.textContent;
+                statusText.textContent = '同期完了 ✓';
+                setTimeout(() => {
+                    statusText.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('データ同期エラー:', err);
+                showNotification('⚠️ クラウド同期に失敗しました', true);
+            }
+        }
+
+        async function autoSync() {
+            if (driveFileId && gapi.client.getToken()) {
+                await syncToGoogleDrive();
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.view-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${view}View`).classList.add('active');
+        }
+
+        function selectMall(mall) {
+            if (!driveFileId) {
+                showNotification('⚠️ 先に「Googleドライブ連携」をクリックしてください', true);
+                return;
+            }
+            selectedMall = mall;
+            document.querySelectorAll('.mall-option').forEach(opt => opt.classList.remove('selected'));
+            event.target.closest('.mall-option').classList.add('selected');
+            document.getElementById('csvFile').disabled = false;
+            document.getElementById('uploadBtn').disabled = false;
+            const mallNames = {'rakuten': '楽天', 'yahoo': 'Yahoo', 'amazon': 'Amazon'};
+            const dateInputSection = document.getElementById('dateInputSection');
+            if (mall === 'yahoo' || mall === 'amazon') {
+                dateInputSection.style.display = 'block';
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('uploadDate').value = today;
+            } else {
+                dateInputSection.style.display = 'none';
+            }
+            document.getElementById('uploadInstruction').textContent = `${mallNames[mall]}のCSVファイルをクリックまたはドラッグ&ドロップ`;
+            showNotification(`${mallNames[mall]}を選択しました`);
+        }
+
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            if (!selectedMall) {
+                showNotification('モールを選択してください', true);
+                return;
+            }
+            if (!driveFileId) {
+                showNotification('⚠️ 先にGoogleドライブに接続してください', true);
+                return;
+            }
+            const files = e.target.files;
+            for (let file of files) {
+                processCSV(file, selectedMall);
+            }
+            e.target.value = '';
+        });
+
+        async function processCSV(file, mall) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                let addedCount = 0;
+                switch(mall) {
+                    case 'rakuten':
+                        addedCount = parseRakutenCSV(text, file.name);
+                        break;
+                    case 'yahoo':
+                        addedCount = parseYahooCSV(text, file.name);
+                        break;
+                    case 'amazon':
+                        addedCount = parseAmazonCSV(text, file.name);
+                        break;
+                }
+                if (addedCount > 0) {
+                    uploadHistory.push({
+                        uploadDate: new Date().toISOString(),
+                        uploadBy: currentUserEmail,
+                        fileName: file.name,
+                        mall: mall,
+                        recordCount: addedCount
+                    });
+                    updateDashboard();
+                    updateTable();
+                    await autoSync();
+                }
+            };
+            if (mall === 'yahoo') {
+                reader.readAsText(file, 'Shift-JIS');
+            } else {
+                reader.readAsText(file, 'UTF-8');
+            }
+        }
+
+        function parseCSVLine(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current.trim().replace(/^"|"$/g, ''));
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current.trim().replace(/^"|"$/g, ''));
+            return values;
+        }
+
+        function parseRakutenCSV(csvText, filename) {
+            const lines = csvText.split('\n');
+            let headerIndex = 5;
+            const headers = lines[headerIndex].split(',').map(h => h.trim().replace(/"/g, ''));
+            let dateStr = null;
+            if (lines.length > 2) {
+                const periodLine = lines[2];
+                const dayPattern = /(\d{4})年(\d{2})月(\d{2})日から(\d{4})年(\d{2})月(\d{2})日/;
+                const dayMatch = periodLine.match(dayPattern);
+                if (dayMatch) {
+                    const startDate = `${dayMatch[1]}-${dayMatch[2]}-${dayMatch[3]}`;
+                    const endDate = `${dayMatch[4]}-${dayMatch[5]}-${dayMatch[6]}`;
+                    if (startDate === endDate) {
+                        dateStr = startDate;
+                    } else {
+                        showNotification(`⚠️ スキップ: 複数日のデータは取り込めません`, true);
+                        return 0;
+                    }
+                }
+            }
+            if (!dateStr) {
+                showNotification('⚠️ 日付を取得できませんでした', true);
+                return 0;
+            }
+            let addedCount = 0;
+            for (let i = headerIndex + 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const values = parseCSVLine(lines[i]);
+                if (values.length < headers.length) continue;
+                const product = {};
+                headers.forEach((header, index) => {
+                    product[header] = values[index];
+                });
+                const formattedProduct = {
+                    date: dateStr,
+                    mall: '楽天',
+                    sku: product['商品管理番号'] || '',
+                    name: product['商品名'] || '',
+                    access: parseInt(product['アクセス人数'] || 0),
+                    sales: parseInt(product['売上'] || 0),
+                    orders: parseInt(product['売上件数'] || 0),
+                    cvr: parseFloat(product['転換率']?.replace('%', '') || 0),
+                    unitPrice: parseInt(product['客単価'] || 0)
+                };
+                dailyData.push(formattedProduct);
+                addedCount++;
+            }
+            showNotification(`✅ ${addedCount}件のデータを読み込みました（日付: ${dateStr}）`);
+            return addedCount;
+        }
+
+        function parseYahooCSV(csvText, filename) {
+            const dateInput = document.getElementById('uploadDate').value;
+            if (!dateInput) {
+                showNotification('⚠️ 日付を入力してください', true);
+                return 0;
+            }
+            const dateStr = dateInput;
+            const lines = csvText.split('\n');
+            const headers = parseCSVLine(lines[0]);
+            const aggregated = {};
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const values = parseCSVLine(lines[i]);
+                if (values.length < headers.length) continue;
+                const name = values[0] || '';
+                const productCode = values[1] || '';
+                const sales = parseInt(values[3] || 0);
+                const orderCount = parseInt(values[4] || 0);
+                const visitors = parseInt(values[12] || 0);
+                if (!productCode) continue;
+                const key = productCode;
+                if (!aggregated[key]) {
+                    aggregated[key] = {
+                        name: name,
+                        sku: productCode,
+                        sales: 0,
+                        orders: 0,
+                        visitors: 0
+                    };
+                }
+                aggregated[key].sales += sales;
+                aggregated[key].orders += orderCount;
+                aggregated[key].visitors = Math.max(aggregated[key].visitors, visitors);
+            }
+            let addedCount = 0;
+            for (const key in aggregated) {
+                const item = aggregated[key];
+                const cvr = item.visitors > 0 ? (item.orders / item.visitors * 100) : 0;
+                const unitPrice = item.orders > 0 ? (item.sales / item.orders) : 0;
+                const formattedProduct = {
+                    date: dateStr,
+                    mall: 'Yahoo',
+                    sku: item.sku,
+                    name: item.name,
+                    access: item.visitors,
+                    sales: item.sales,
+                    orders: item.orders,
+                    cvr: cvr,
+                    unitPrice: unitPrice
+                };
+                dailyData.push(formattedProduct);
+                addedCount++;
+            }
+            showNotification(`✅ ${addedCount}件の商品データを読み込みました（日付: ${dateStr}）`);
+            return addedCount;
+        }
+
+        function parseAmazonCSV(csvText, filename) {
+            const dateInput = document.getElementById('uploadDate').value;
+            if (!dateInput) {
+                showNotification('⚠️ 日付を入力してください', true);
+                return 0;
+            }
+            const dateStr = dateInput;
+            const lines = csvText.split('\n');
+            if (lines.length < 2) {
+                showNotification('⚠️ CSVファイルが空です', true);
+                return 0;
+            }
+            const headers = parseCSVLine(lines[0]);
+            const asinIndex = headers.findIndex(h => h.includes('ASIN'));
+            const titleIndex = headers.findIndex(h => h.includes('タイトル'));
+            const pageViewIndex = headers.findIndex(h => h.includes('ページビュー') && h.includes('合計'));
+            const unitSessionRateIndex = headers.findIndex(h => h.includes('ユニットセッション率'));
+            const salesIndex = headers.findIndex(h => h.includes('注文商品の売上額'));
+            const orderCountIndex = headers.findIndex(h => h.includes('注文された商品点数'));
+            let addedCount = 0;
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const values = parseCSVLine(lines[i]);
+                if (values.length < headers.length) continue;
+                const asin = values[asinIndex] || '';
+                const title = values[titleIndex] || '';
+                const pageView = parseInt(values[pageViewIndex] || 0);
+                const unitSessionRate = parseFloat((values[unitSessionRateIndex] || '0').replace('%', ''));
+                const salesText = (values[salesIndex] || '￥0').replace(/￥|,/g, '');
+                const sales = parseInt(salesText || 0);
+                const orderCount = parseInt(values[orderCountIndex] || 0);
+                if (!asin) continue;
+                const unitPrice = orderCount > 0 ? Math.round(sales / orderCount) : 0;
+                const formattedProduct = {
+                    date: dateStr,
+                    mall: 'Amazon',
+                    sku: asin,
+                    name: title,
+                    access: pageView,
+                    sales: sales,
+                    orders: orderCount,
+                    cvr: unitSessionRate,
+                    unitPrice: unitPrice
+                };
+                dailyData.push(formattedProduct);
+                addedCount++;
+            }
+            showNotification(`✅ ${addedCount}件のAmazon商品データを読み込みました（日付: ${dateStr}）`);
+            return addedCount;
+        }
+
+        function updateDashboard() {
+            const totalAccess = dailyData.reduce((sum, p) => sum + p.access, 0);
+            const totalSales = dailyData.reduce((sum, p) => sum + p.sales, 0);
+            const totalOrders = dailyData.reduce((sum, p) => sum + p.orders, 0);
+            const avgCVR = totalAccess > 0 ? (totalOrders / totalAccess * 100) : 0;
+            document.getElementById('totalAccess').textContent = totalAccess.toLocaleString();
+            document.getElementById('totalSales').textContent = '¥' + totalSales.toLocaleString();
+            document.getElementById('totalOrders').textContent = totalOrders.toLocaleString();
+            document.getElementById('avgCVR').textContent = avgCVR.toFixed(2) + '%';
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            if (dailyData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">📂</div><p>CSVファイルをアップロードしてください</p></td></tr>`;
+                return;
+            }
+            const sorted = [...dailyData].sort((a, b) => new Date(b.date) - new Date(a.date));
+            tbody.innerHTML = sorted.map(p => `
+                <tr>
+                    <td>${p.date}</td>
+                    <td><span class="mall-badge ${p.mall}">${p.mall}</span></td>
+                    <td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600;">${p.sku}</td>
+                    <td>${p.name.substring(0, 50)}${p.name.length > 50 ? '...' : ''}</td>
+                    <td>${p.access.toLocaleString()}</td>
+                    <td>¥${p.sales.toLocaleString()}</td>
+                    <td>${p.orders.toLocaleString()}</td>
+                    <td>${p.cvr.toFixed(2)}%</td>
+                </tr>
+            `).join('');
+        }
+
+       // ========== 期間フィルター機能 ==========
+        let currentPeriodFilter = 'thisMonth';
+        let customStartDate = null;
+        let customEndDate = null;
+
+        function setPeriodFilter(period, button) {
+            // アクティブ状態を更新
+            document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            currentPeriodFilter = period;
+            
+            // カスタム日付入力の表示/非表示
+            const customInputs = document.getElementById('customDateInputs');
+            if (period === 'custom') {
+                customInputs.classList.add('show');
+            } else {
+                customInputs.classList.remove('show');
+                // 期間表示を更新
+                updatePeriodDisplay();
+                // データが既に表示されていれば再フィルタリング
+                if (currentTrendData && currentTrendData.length > 0) {
+                    reloadWithFilter();
+                }
+            }
+        }
+
+        function applyCustomDateFilter() {
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+            
+            if (!startDate || !endDate) {
+                showNotification('開始日と終了日を選択してください', true);
+                return;
+            }
+            
+            if (new Date(startDate) > new Date(endDate)) {
+                showNotification('開始日は終了日より前の日付を選択してください', true);
+                return;
+            }
+            
+            customStartDate = startDate;
+            customEndDate = endDate;
+            
+            updatePeriodDisplay();
+            
+            // データが既に表示されていれば再フィルタリング
+            if (currentTrendData && currentTrendData.length > 0) {
+                reloadWithFilter();
+            }
+        }
+
+        function getDateRange() {
+            const today = new Date();
+            let startDate, endDate;
+            
+            switch (currentPeriodFilter) {
+                case 'thisMonth':
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    break;
+                case 'last2Months':
+                    startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    break;
+                case 'custom':
+                    startDate = customStartDate ? new Date(customStartDate) : new Date(today.getFullYear(), today.getMonth(), 1);
+                    endDate = customEndDate ? new Date(customEndDate) : today;
+                    break;
+                default:
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    endDate = today;
+            }
+            
+            return { startDate, endDate };
+        }
+
+        function updatePeriodDisplay() {
+            const { startDate, endDate } = getDateRange();
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const startStr = startDate.toLocaleDateString('ja-JP', options);
+            const endStr = endDate.toLocaleDateString('ja-JP', options);
+            
+            const display = document.getElementById('periodDisplay');
+            if (display) {
+                display.textContent = `表示期間: ${startStr} 〜 ${endStr}`;
+            }
+        }
+
+        function filterDataByPeriod(data) {
+            const { startDate, endDate } = getDateRange();
+            
+            return data.filter(item => {
+                const itemDate = new Date(item.date);
+                return itemDate >= startDate && itemDate <= endDate;
+            });
+        }
+
+        function reloadWithFilter() {
+            if (!currentSKU || !currentMall) return;
+            
+            // SKUとモールでフィルタリング
+            let filtered = dailyData.filter(d => d.sku === currentSKU && d.mall === currentMall);
+            
+            // 期間でフィルタリング
+            filtered = filterDataByPeriod(filtered);
+            
+            if (filtered.length === 0) {
+                showNotification('選択した期間にデータがありません', true);
+                return;
+            }
+            
+            filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            const relevantActions = actionsData.filter(a => 
+                a.sku === currentSKU && (a.mall === currentMall || a.mall === '全サイト')
+            );
+            
+            // 期間でアクションもフィルタリング
+            const filteredActions = filterDataByPeriod(relevantActions);
+            
+            displayActions(filteredActions);
+            renderCharts(filtered, filteredActions);
+            renderTrendTable(filtered, filteredActions);
+            
+            showNotification(`✅ ${filtered.length}件のデータを表示`);
+        }
+
+        function initPeriodFilter() {
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            const startInput = document.getElementById('filterStartDate');
+            const endInput = document.getElementById('filterEndDate');
+            
+            if (startInput) startInput.value = firstDay.toISOString().split('T')[0];
+            if (endInput) endInput.value = today.toISOString().split('T')[0];
+            
+            updatePeriodDisplay();
+        }
+
+function loadTrendData() {
+    const sku = document.getElementById('trendSKU').value.trim();
+    const mall = document.getElementById('trendMall').value;
+    
+    if (!sku) {
+        showNotification('SKUを入力してください', true);
+        return;
+    }
+    
+    // SKUとモールでフィルタリング
+    let filtered = dailyData.filter(d => d.sku === sku && d.mall === mall);
+    
+    if (filtered.length === 0) {
+        showNotification('該当するデータが見つかりません', true);
+        return;
+    }
+    
+    // 期間でフィルタリング
+    filtered = filterDataByPeriod(filtered);
+    
+    if (filtered.length === 0) {
+        showNotification('選択した期間にデータがありません。期間を変更してください', true);
+        return;
+    }
+    
+    filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    const productName = filtered[0].name;
+    currentTrendData = dailyData.filter(d => d.sku === sku && d.mall === mall); // 全データを保持
+    currentProductName = productName;
+    currentSKU = sku;
+    currentMall = mall;
+    
+    const relevantActions = actionsData.filter(a => 
+        a.sku === sku && (a.mall === mall || a.mall === '全サイト')
+    );
+    
+    // 期間でアクションもフィルタリング
+    const filteredActions = filterDataByPeriod(relevantActions);
+    
+    displayActions(filteredActions);
+    
+    // 安全に要素を表示
+    const viewToggle = document.getElementById('viewToggleContainer');
+    const chart1 = document.getElementById('chartContainer');
+    const chart2 = document.getElementById('chartContainer2');
+    const chart3 = document.getElementById('chartContainer3');
+    const table = document.getElementById('trendTableContainer');
+    
+    if (viewToggle) viewToggle.style.display = 'block';
+    if (chart1) chart1.style.display = 'block';
+    if (chart2) chart2.style.display = 'block';
+    if (chart3) chart3.style.display = 'block';
+    if (table) table.style.display = 'block';
+    
+    renderCharts(filtered, filteredActions);
+    renderTrendTable(filtered, filteredActions);
+    showNotification(`✅ ${filtered.length}件の日次推移を表示しました`);
+}
+        function displayActions(actions) {
+            const container = document.getElementById('productActions');
+            
+            if (actions.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            container.innerHTML = `
+                <div class="search-section">
+                    <h3 style="margin-bottom: 1rem;">📌 この商品の施策履歴</h3>
+                    ${actions.map(a => `
+                        <div style="position: relative; padding: 0.5rem 1rem; margin: 0.5rem 0; background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border-left: 4px solid var(--warning); border-radius: 8px;">
+                            <strong>${a.date}</strong> - ${a.category}: ${a.content}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderTrendTable(data, actions) {
+            const tbody = document.getElementById('trendTableBody');
+            document.getElementById('trendTableTitle').textContent = currentProductName;
+            
+            tbody.innerHTML = data.map(d => {
+                const hasAction = actions.find(a => a.date === d.date);
+                const actionStyle = hasAction ? 'background: rgba(245, 158, 11, 0.1);' : '';
+                
+                return `
+                    <tr style="${actionStyle}">
+                        <td>
+                            ${d.date}
+                            ${hasAction ? '<br><span style="display: inline-block; padding: 0.25rem 0.5rem; background: var(--warning); color: white; border-radius: 6px; font-size: 0.7rem;">📌 ' + hasAction.category + '</span>' : ''}
+                        </td>
+                        <td>${d.access.toLocaleString()}</td>
+                        <td>¥${d.sales.toLocaleString()}</td>
+                        <td>${d.orders.toLocaleString()}</td>
+                        <td>${d.cvr.toFixed(2)}%</td>
+                        <td>¥${d.unitPrice.toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderCharts(data, actions) {
+            const dates = data.map(d => d.date);
+            const sales = data.map(d => d.sales);
+            const cvr = data.map(d => d.cvr);
+            const access = data.map(d => d.access);
+            
+            document.getElementById('chartProductName').textContent = currentProductName;
+            
+            const actionAnnotations = actions.map(action => ({
+                type: 'line',
+                xMin: action.date,
+                xMax: action.date,
+                borderColor: 'rgb(245, 158, 11)',
+                borderWidth: 3,
+                borderDash: [5, 5],
+                label: {
+                    content: `📌 ${action.category}`,
+                    enabled: true,
+                    position: 'start',
+                    backgroundColor: 'rgb(245, 158, 11)',
+                    color: 'white',
+                    font: {
+                        size: 11
+                    }
+                }
+            }));
+            
+            if (salesChart) salesChart.destroy();
+            salesChart = new Chart(document.getElementById('salesChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: '売上（円）',
+                        data: sales,
+                        borderColor: 'rgb(6, 182, 212)',
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '売上推移',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { display: true }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '¥' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            if (cvrChart) cvrChart.destroy();
+            cvrChart = new Chart(document.getElementById('cvrChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'CVR（%）',
+                        data: cvr,
+                        borderColor: 'rgb(16, 185, 129)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'CVR推移',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { display: true }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(2) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            if (accessChart) accessChart.destroy();
+            accessChart = new Chart(document.getElementById('accessChart'), {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'アクセス数',
+                        data: access,
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                        borderColor: 'rgb(99, 102, 241)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'アクセス数推移',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { display: true }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+function exportTrendData() {
+    if (currentTrendData.length === 0) {
+        showNotification('エクスポートするデータがありません', true);
+        return;
+    }
+    
+    const relevantActions = actionsData.filter(a => 
+        a.sku === currentSKU && (a.mall === currentMall || a.mall === '全サイト')
+    );
+    
+    const csv = [
+        ['商品名', currentProductName],
+        ['SKU', currentSKU],
+        ['モール', currentMall],
+        [''],
+        ['日付', 'アクセス数', '売上', '注文数', 'CVR(%)', '客単価', '施策カテゴリ', '施策内容', '期待効果'],
+        ...currentTrendData.map(d => {
+            const action = relevantActions.find(a => a.date === d.date);
+            return [
+                d.date,
+                d.access,
+                d.sales,
+                d.orders,
+                d.cvr.toFixed(2),
+                d.unitPrice,
+                action ? action.category : '',
+                action ? action.content : '',
+                action ? action.expected : ''
+            ];
+        })
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `日次推移_${currentSKU}_${currentMall}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    showNotification('✅ 日次推移データ（施策情報付き）をエクスポートしました');
+}
+
+        async function addAction() {
+            const action = {
+                date: document.getElementById('actionDate').value,
+                mall: document.getElementById('actionMall').value,
+                sku: document.getElementById('actionSKU').value,
+                category: document.getElementById('actionCategory').value,
+                content: document.getElementById('actionContent').value,
+                expected: document.getElementById('actionExpected').value,
+                id: Date.now(),
+                createdBy: currentUserEmail
+            };
+            if (!action.date || !action.sku || !action.content) {
+                showNotification('必須項目を入力してください', true);
+                return;
+            }
+            actionsData.push(action);
+            updateActionsTable();
+            document.getElementById('actionDate').value = '';
+            document.getElementById('actionSKU').value = '';
+            document.getElementById('actionContent').value = '';
+            document.getElementById('actionExpected').value = '';
+            showNotification('✅ 施策を記録しました');
+            await autoSync();
+        }
+
+ function updateActionsTable() {
+    const tbody = document.getElementById('actionsTableBody');
+    if (actionsData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="empty-state-icon">📋</div><p>施策を記録してください</p></td></tr>`;
+        return;
+    }
+    const sorted = [...actionsData].sort((a, b) => new Date(b.date) - new Date(a.date));
+    tbody.innerHTML = sorted.map((action, index) => {
+        const originalIndex = actionsData.findIndex(a => a.id === action.id);
+        return `
+            <tr>
+                <td>${action.date}</td>
+                <td><span class="mall-badge ${action.mall}">${action.mall}</span></td>
+                <td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600;">${action.sku}</td>
+                <td><span style="display: inline-block; padding: 0.25rem 0.75rem; background: var(--warning); color: white; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">${action.category}</span></td>
+                <td>${action.content}</td>
+                <td>${action.expected}</td>
+                <td><button class="delete-btn" onclick="deleteAction(${originalIndex})">🗑️</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+let deleteTargetIndex = -1;
+
+function deleteAction(index) {
+    deleteTargetIndex = index;
+    document.getElementById('deleteModal').classList.add('show');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    deleteTargetIndex = -1;
+}
+
+async function confirmDelete() {
+    if (deleteTargetIndex >= 0 && deleteTargetIndex < actionsData.length) {
+        actionsData.splice(deleteTargetIndex, 1);
+        updateActionsTable();
+        showNotification('✅ 施策記録を削除しました');
+        closeDeleteModal();
+        await autoSync();
+    }
+}
+
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            let className = 'notification show';
+            if (isError) {
+                className += ' error';
+            }
+            notification.className = className;
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 期間フィルターの初期化
+            initPeriodFilter();
+            
+            if (API_KEY && CLIENT_ID) {
+                gapiLoaded();
+                gisLoaded();
+            } else {
+                showNotification('⚠️ Google API設定が必要です', true);
+            }
+        });
+    </script>
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <h3 class="modal-title">🗑️ 施策記録を削除</h3>
+            <div class="modal-content">
+                この施策記録を削除してもよろしいですか？<br>
+                この操作は取り消せません。
+            </div>
+            <div class="modal-buttons">
+                <button clas
