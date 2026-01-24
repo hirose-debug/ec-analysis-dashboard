@@ -1,0 +1,22 @@
+# ECモール商品分析ダッシュボード
+# Gitで管理しないファイル
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ログファイル
+*.log
+
+# ローカル開発用
+node_modules/
+.env
